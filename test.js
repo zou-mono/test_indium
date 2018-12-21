@@ -15,10 +15,21 @@
 // console.log(add(2,3));
 
 var http = require('http');
-var a = 5;
-console.log("start...");
-http.createServer(function (req, res) {
+console.log("start...");   
+
+var server = http.createServer(function (req, res) {
   res.writeHead(200, {'Content-Type': 'text/plain'});
   res.end('Hello World\n');
-}).listen(1337, '127.0.0.1');
-console.log('Server running at http://127.0.0.1:1337/');
+}).listen(1337, '0.0.0.0');
+
+server.on('request',function(){
+  var a =7;
+  console.log('收到客户端发出的请求.......');
+});
+
+// console.log('Server running at http://0.0.0.0:1337/');
+
+
+
+
+

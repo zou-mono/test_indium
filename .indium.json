@@ -3,8 +3,7 @@
         {
             "name": "Web project",
             "type": "chrome",
-            "url": "http://0.0.0.0:3000",
-            "port": 9222
+            "url": "http://0.0.0.0:3000"
         },
         {
             "name": "local test",
@@ -15,7 +14,26 @@
             "name": "Node project",
             "type": "node",
             "command": "node ./test.js",
+            "inspect-brk":false,
+            "port":1337
+        },
+        {
+            "name": "chrome",
+            "type": "chrome",
+            "url":"http://0.0.0.0:1337"
+        },
+        {
+            "name": "test2",
+            "type": "node",
+            "command": "node ./test2.js",
             "inspect-brk":true
+        },
+        {
+            "name": "server",
+            "type": "node",
+            "command": "node ./server.js",
+            "inspect-brk":true,
+            "port":9220
         }
   ]
 }

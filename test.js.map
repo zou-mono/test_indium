@@ -1,0 +1,8 @@
+{
+"version":3,
+"file":"",
+"lineCount":1,
+"mappings":"AAgBA,IAAIA,KAAOC,OAAA,CAAQ,MAAR,CAAX,CACIC,EAAI,CACRC,QAAAC,IAAA,CAAY,UAAZ,CACAJ,KAAAK,aAAA,CAAkB,QAAS,CAACC,CAAD,CAAMC,CAAN,CAAW,CACpCA,CAAAC,UAAA,CAAc,GAAd,CAAmB,CAAC,eAAgB,YAAjB,CAAnB,CACED,EAAAE,IAAA,CAAQ,eAAR,CAFkC,CAAtC,CAAAC,OAAA,CAGU,IAHV,CAGgB,SAHhB,CAIAP,QAAAC,IAAA,CAAY,4CAAZ;",
+"sources":["test.js"],
+"names":["http","require","a","console","log","createServer","req","res","writeHead","end","listen"]
+}

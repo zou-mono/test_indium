@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html style="height: 100%">
+<head>
+    <meta charset="utf-8">
+</head>
+<body style="height: 100%;margin:0px;overflow:hidden">
+<div id="container" style="height:100%"></div>
+<script src="js/jquery-3.1.1.min.js"></script>
+<script type="text/javascript" src="js/echart3-min.js"></script>
+<script type="text/javascript" src="js/papaparse.min.js"></script>
+<script type="text/javascript" src="js/JenksFisher.js"></script>
+<!--
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/dataTool.min.js"></script>
+<script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=lbvmtR1hSGoDEtDqZxyKQuefabqoVoOB"></script>
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/bmap.min.js"></script>
+-->
+<script type="text/javascript">
+    var dom = document.getElementById("container");
+    var myChart = echarts.init(dom);
+    var app = {};
+    option = null;
+    myChart.showLoading();
+
+    var total = [];
+    var region_name = [];
+    Papa.parse('data/V3/total.csv', {
+        download: true,
+        skipEmptyLines: true,
+        complete: function (results) {
+            for (var i = 0; i < results.data.length; i++) {
+                var tmp = [];
+                tmp["name"] = results.data[i][0];
+                tmp["value"] = Math.round(Number(results.data[i][1]));
+                total.push(tmp);
+                if(results.data[i][0] != "深圳")
+                    region_name.push(results.data[i][0]);
+            }
+        }
+    });
+
+    var geoCoordMap = {};
+    Papa.parse('data/V3/geoCoordMap.csv', {
+        download: true,
+        skipEmptyLines: true,
+        complete: function (results) {
+            for (var i = 0; i < results.data.length; i++) {
+                geoCoordMap[results.data[i][0]] = [Number(results.data[i][1]), Number(results.data[i][2])];
+            }
+        }
+    });
+
+    var od_all = [];
+    var od_top = [];
+    Papa.parse('data/V3/OD_all.csv', {
+        download: true,
+        skipEmptyLines: true,
+        complete: function (results) {
+            for (var i = 0; i < results.data.length; i++) {
+                var tmp = [];
+                tmp["O"] = results.data[i][0]
+                tmp["D"] = results.data[i][1];
+                var jd = Number(results.data[i][2]);
+                if (jd > 800000) {
+                    od_top.push(tmp);
+                }
+                tmp["value"] = Math.round(jd);
+                od_all.push(tmp);
+            }
+        }
+    });
+
+    var extractValue = function (data) {
+        var test = [];
+        for (var i = 0; i < data.length; i++) {
+            test.push(data[i]["value"]);
+        }
+        return test;
+    };
+
+    var setSymbolSize = function (data, n) {
+        var test = extractValue(data);
+        return createJenksFisherBreaksArray(test, n);
+    };
+
+    var convertData = function (data) {
+        var res = [];
+        for (i = 0; i < data.length; i++) {
+            var dataItem = data[i];
+            var fromCoord = geoCoordMap[dataItem["O"]];
+            var toCoord = geoCoordMap[dataItem["D"]];
+            if (fromCoord && toCoord) {
+                res.push({
+                    fromName: dataItem["O"],
+                    toName: dataItem["D"],
+                    coords: [fromCoord, toCoord],
+                    value: dataItem["value"]
+                });
+            }
+        }
+        return res;
+    };
+
+    $.get('data/V3/region.geojson', function (geoJson) {
+        var all_data = convertData(od_all);
+        var top_data = convertData(od_top);
+
+        myChart.hideLoading();
+        var SymbolSizeLevel = setSymbolSize(total, 3); //setSymbolSize
+        echarts.registerMap('guangdong', geoJson);
+
+        var queryData = function (name, dir) {
+            var res = [];
+            for (var i = 0; i < all_data.length; i++) {
+                if (dir == 0 && all_data[i]["fromName"] == name) {
+                    res.push({
+                        name: all_data[i]["toName"],
+                        value: all_data[i]["value"]*2
+                    });
+                }
+                else if (dir == 1 && all_data[i]["toName"] == name) {
+                    res.push({
+                        name: all_data[i]["fromName"],
+                        value: all_data[i]["value"]*2
+                    });
+                }
+            }
+            return res;
+        };
+
+        var visualMap_regionflow = {
+            type: 'piecewise',
+            show: true,
+            seriesIndex: 1,
+            splitNumber: 3,
+            left: '5%',
+            //top: 'middle',
+            bottom: '5%',
+            pieces: [
+                {min: 800000, label: '流量>800000'},
+                {min: 150000, max: 800000, label: '流量[150000,800000)'},//
+                {min: 100000, max: 150000, label: '流量[100000,150000)'},//
+                {max: 100000, label: '流量<100000'}//
+            ],
+            //text:['High','Low'],
+            textStyle: {
+                color: '#fff',
+                fontSize: 16
+            },
+            inRange: {
+                color: ['red', 'yellow', '#7CFC00', 'green'].reverse()
+            },
+            outRange: {
+                color: '#010119'
+            }
+        };
+        var series_total = {
+            name: "total",
+            type: 'scatter',
+            zlevel: 9,
+            z: 6,
+            coordinateSystem: 'geo',
+            label: {
+                normal: {
+                    show: true,
+                    position: 'right',
+                    formatter: '{b}',
+                    textStyle: {fontSize: 16}
+                }
+            },
+            itemStyle: {
+                normal: {
+                    color: '#00F5FF',
+                    shadowBlur: 10,
+                    shadowColor: '#333'
+                }
+            },
+            symbolSize:10,
+//            symbolSize: function (val) {
+//                //return Math.log(val[2]);
+//                for (i = 0; i < SymbolSizeLevel.length - 1; i++) {
+//                    if (val[2] >= SymbolSizeLevel[i] && val[2] <= SymbolSizeLevel[i + 1]) {
+//                        if (i == 0) return 5;
+//                        return i * 6 + 5;
+//                    }
+//                }
+//            },
+            data: total.map(function (dataItem) {
+                return {
+                    name: dataItem["name"],
+                    //value: geoCoordMap[dataItem["name"]].concat([dataItem["value"]])
+                    value: geoCoordMap[dataItem["name"]].concat([dataItem["value"]])
+                };
+            })
+        };
+
+        var series_od_top = {
+            name: "od_top",
+            type: 'lines',
+            zlevel: 4,
+            z: 5,
+            effect: {
+                show: true,
+                constantSpeed: 50,
+                //period: 4,
+                trailLength: 0.7,
+                symbol: 'arrow',
+                color: 'red',//'#fff'
+                symbolSize: 5
+            },
+            lineStyle: {
+                normal: {
+                    color: 'red',
+                    width: 4,
+                    curveness: 0.25
+                },
+                emphasis: {
+                    width: 7,
+                    curveness: 0.25
+                }
+            },
+            data: top_data
+        };
+
+        var series_od_middle = {
+            name: "od_middle",
+            type: 'lines',
+            zlevel: 3,
+            z: 4,
+            large: true,
+            effect: {
+                show: true,
+                //period: 6,
+                constantSpeed: 30,
+                trailLength: 0.7,
+                //color: '#fff',
+                symbol: 'arrow',
+                symbolSize: 7
+            },
+            lineStyle: {
+                normal: {
+                    width: 2,
+                    curveness: 0.35
+                },
+                emphasis: {
+                    width: 7,
+                    curveness: 0.4
+                }
+            },
+            data: all_data
+        };
+
+        var inflow = queryData("深圳", 1);
+        var series_in = {
+            name: "inflow",
+            type: 'pie',
+            zlevel: 9,
+            z: 6,
+            //roseType: 'radius',
+            hoverAnimation: true,
+            label: {
+                normal: {
+                    show: true,
+                    position: 'outside',
+                    formatter: function(params){
+                        return params.name + '('+ Math.round(params.value/10000) + '万)'
+                    },
+                    textStyle: {
+                        fontSize: 12
+                    }
+                }
+            },
+            center: ['80%', '70%'],
+            radius: ['2%', '30%'],
+            data: inflow
+        };
+        var outflow = queryData("深圳", 0);
+//        var series_out = {
+//            name: "outflow",
+//            type: 'pie',
+//            zlevel: 9,
+//            z: 6,
+//            //roseType: 'radius',
+//            hoverAnimation: true,
+//            label: {
+//                normal: {
+//                    show: true,
+//                    position: 'right',
+//                    formatter: '{b}',
+//                    textStyle: {
+//                        fontSize: 16
+//                    }
+//                }
+//            },
+//            center: ['80%', '20%'],
+//            radius: ['2%', '30%'],
+//            data: inflow
+//        };
+
+        var series = [];
+        series.push(series_total, series_od_middle, series_od_top, series_in);
+
+        var option = {
+            //backgroundColor: '#1b1b1b',
+            backgroundColor: '#404a59',
+            color: ['#c23531', '#61a0a8', '#d48265', '#91c7ae','#749f83',  '#ca8622', '#bda29a','#6e7074', '#546570', '#c4ccd3'],
+            //['#FF0000', '#FF34B3', '#FF6347', '#FFFF00', '#B3EE3A', '#C1FFC1', '#7B68EE', '#BFEFFF'],
+            title: [{
+                //text: '珠三角地区交通出行空间分布图（全天）',
+                zlevel: 3,
+                left: 'center',
+                top: '5%',
+                textStyle: {
+                    color: '#fff',
+                    fontSize: 30
+                }
+            }],
+//            legend: {
+//                right : '5%',
+//                bottom : '25%',
+//                textStyle: {
+//                    color: '#fff'
+//                },
+//                data: region_name
+//            },
+            geo: {
+                map: 'guangdong',
+                zlevel: 1,
+                left: '20%',
+                top: '15%',
+                show: true,
+                selectedMode: false,
+                label: {
+                    emphasis: {
+                        show: false
+                    }
+                },
+                itemStyle: {
+                    normal: {
+                        areaColor: '#323c48',
+                        borderColor: '#111'
+                    },
+                    emphasis: {
+                        areaColor: '#2a333d'
+                    }
+                },
+                roam: true
+            },
+            tooltip: {
+                trigger: 'item',
+                formatter: function (params) {
+                    if (params.seriesName == "total") {
+                        return "OD流量" + "(" + params.data["name"] + ")" + ":" + params.value[2];
+                    }
+                    else if (params.seriesName == "od_middle" || params.seriesName == "od_top"){
+                        return params.data["fromName"] + "->" + params.data["toName"] + "流量:" + params.value;
+                    }
+                }
+            },
+            visualMap: visualMap_regionflow,
+            series: series
+        };
+
+        //option.series=option.series.slice(0,2);
+        myChart.setOption(option, true);
+    });
+
+    window.onresize = myChart.resize;
+    window.onunload = function () {
+        myChart.dispose();
+    }
+</script>
+</body>
+</html>
